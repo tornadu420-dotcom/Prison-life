@@ -1,0 +1,907 @@
+--[[
+PRISON LIFE - MOBILE MENU COMPLETO
+Noclip + Fly + Aimbot + ESP CORRIGIDO
+ESP colorido por TEAM + Seleção de Alvo do Aimbot + Quick Access + Fly Speed Control
+Menu Quadrado Otimizado
+]]
+
+---
+
+-- SERVICES
+
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local UIS = game:GetService("UserInputService")
+
+local LP = Players.LocalPlayer
+local Camera = workspace.CurrentCamera
+
+
+---
+
+-- CONFIG
+
+local CFG = {
+	Noclip = false,
+	Fly = false,
+	Aimbot = false,
+	ESP = true,
+
+	FOV = 45,  
+	AimSmooth = 1, -- 1 = forte / maior = mais suave
+	
+	-- SELEÇÃO DE ALVO DO AIMBOT
+	AimbotTargetTeams = {
+		Guards = true,
+		Police = true,
+		Criminals = true,
+		Inmates = true
+	},
+	
+	-- QUICK ACCESS
+	QuickAccessFeature = "Aimbot", -- Qual feature o botão rápido vai ativar
+	
+	-- FLY SPEED
+	FlySpeed = 40,
+	FlySpeedMin = 10,
+	FlySpeedMax = 150,
+
+}
+
+-- Cache de ESPs
+local ESPCache = {}
+
+-- Estado das abas
+local CurrentTab = "Main" -- Main, FlySpeed, AimbotTarget, QuickAccess
+
+
+---
+
+-- FUNÇÃO INIMIGO (PRISON LIFE)
+
+local function IsEnemy(plr)
+	if not plr or plr == LP then return false end
+	if not plr.Team or not LP.Team then return false end
+
+	local my = LP.Team.Name  
+	local his = plr.Team.Name  
+
+	-- POLICIAL  
+	if my == "Guards" or my == "Police" then  
+		return his == "Inmates" or his == "Criminals"  
+	end  
+
+	-- PRISIONEIRO  
+	if my == "Inmates" then  
+		return his == "Guards" or his == "Police" or his == "Criminals"  
+	end  
+
+	-- CRIMINOSO  
+	if my == "Criminals" then  
+		return true  
+	end  
+
+	return false
+
+end
+
+
+---
+
+-- COR DO ESP POR TIME
+
+local function GetESPColor(plr)
+	if not plr.Team then
+		return Color3.fromRGB(255,255,255)
+	end
+
+	if plr.Team.Name == "Guards" or plr.Team.Name == "Police" then  
+		return Color3.fromRGB(0,120,255) -- AZUL  
+	end  
+
+	if plr.Team.Name == "Criminals" then  
+		return Color3.fromRGB(255,0,0) -- VERMELHO  
+	end  
+
+	if plr.Team.Name == "Inmates" then  
+		return Color3.fromRGB(255,150,0) -- LARANJA  
+	end  
+
+	return Color3.fromRGB(255,255,255)
+
+end
+
+
+---
+
+-- GUI PRINCIPAL
+
+local gui = Instance.new("ScreenGui", LP.PlayerGui)
+gui.Name = "PrisonLifeMenu"
+gui.ResetOnSpawn = false
+
+-- QUICK ACCESS BUTTON (CANTO SUPERIOR ESQUERDO)
+local quickAccessBtn = Instance.new("TextButton", gui)
+quickAccessBtn.Name = "QuickAccessButton"
+quickAccessBtn.Size = UDim2.new(0, 60, 0, 60)
+quickAccessBtn.Position = UDim2.new(0, 10, 0, 10)
+quickAccessBtn.Text = "🎯"
+quickAccessBtn.TextSize = 28
+quickAccessBtn.TextColor3 = Color3.new(1, 1, 1)
+quickAccessBtn.BackgroundColor3 = Color3.fromRGB(255, 0, 0)
+quickAccessBtn.BorderSizePixel = 0
+quickAccessBtn.ZIndex = 105
+Instance.new("UICorner", quickAccessBtn).CornerRadius = UDim.new(1, 0)
+
+-- LABEL DO QUICK ACCESS (mostra qual feature está configurado)
+local quickAccessLabel = Instance.new("TextLabel", gui)
+quickAccessLabel.Name = "QuickAccessLabel"
+quickAccessLabel.Size = UDim2.new(0, 80, 0, 20)
+quickAccessLabel.Position = UDim2.new(0, 10, 0, 75)
+quickAccessLabel.Text = "Aimbot"
+quickAccessLabel.Font = Enum.Font.GothamBold
+quickAccessLabel.TextSize = 12
+quickAccessLabel.TextColor3 = Color3.new(1, 1, 1)
+quickAccessLabel.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+quickAccessLabel.BackgroundTransparency = 0.3
+quickAccessLabel.BorderSizePixel = 0
+quickAccessLabel.ZIndex = 105
+Instance.new("UICorner", quickAccessLabel).CornerRadius = UDim.new(0, 8)
+
+-- BOTÃO PARA ABRIR MENU (CANTO SUPERIOR DIREITO)
+local openBtn = Instance.new("TextButton", gui)
+openBtn.Size = UDim2.new(0, 60, 0, 60)
+openBtn.Position = UDim2.new(1, -70, 0, 10)
+openBtn.Text = "☰"
+openBtn.TextSize = 28
+openBtn.TextColor3 = Color3.new(1, 1, 1)
+openBtn.BackgroundColor3 = Color3.fromRGB(0, 200, 100)
+openBtn.BorderSizePixel = 0
+openBtn.ZIndex = 100
+Instance.new("UICorner", openBtn).CornerRadius = UDim.new(1, 0)
+
+-- MENU PRINCIPAL QUADRADO
+local frame = Instance.new("Frame", gui)
+frame.Size = UDim2.new(0, 350, 0, 400)
+frame.Position = UDim2.new(0.5, -175, 0.5, -200)
+frame.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
+frame.Visible = false
+frame.ZIndex = 100
+Instance.new("UICorner", frame).CornerRadius = UDim.new(0, 18)
+
+-- HEADER COM ABAS
+local headerFrame = Instance.new("Frame", frame)
+headerFrame.Size = UDim2.new(1, 0, 0, 50)
+headerFrame.BackgroundColor3 = Color3.fromRGB(15, 15, 15)
+headerFrame.BorderSizePixel = 0
+headerFrame.ZIndex = 100
+Instance.new("UICorner", headerFrame).CornerRadius = UDim.new(0, 18)
+
+local title = Instance.new("TextLabel", headerFrame)
+title.Size = UDim2.new(1, 0, 1, 0)
+title.Text = "PRISON LIFE"
+title.Font = Enum.Font.GothamBold
+title.TextSize = 18
+title.TextColor3 = Color3.fromRGB(0, 255, 200)
+title.BackgroundTransparency = 1
+title.ZIndex = 100
+
+-- ABAS
+local tabs = Instance.new("Frame", frame)
+tabs.Size = UDim2.new(1, 0, 0, 45)
+tabs.Position = UDim2.new(0, 0, 0, 50)
+tabs.BackgroundColor3 = Color3.fromRGB(25, 25, 30)
+tabs.BorderSizePixel = 0
+tabs.ZIndex = 100
+
+local tabNames = {"Main", "Fly Speed", "Aim Target", "Quick"}
+local tabButtons = {}
+
+local function MakeTab(name, index)
+	local btn = Instance.new("TextButton", tabs)
+	btn.Size = UDim2.new(0.25, -2, 1, 0)
+	btn.Position = UDim2.new((index - 1) * 0.25, 0, 0, 0)
+	btn.Text = name
+	btn.Font = Enum.Font.GothamBold
+	btn.TextSize = 11
+	btn.TextColor3 = Color3.new(0.7, 0.7, 0.7)
+	btn.BackgroundColor3 = Color3.fromRGB(30, 30, 35)
+	btn.BorderSizePixel = 0
+	btn.ZIndex = 100
+	Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 8)
+	
+	table.insert(tabButtons, btn)
+	return btn
+end
+
+for i, tabName in pairs(tabNames) do
+	MakeTab(tabName, i)
+end
+
+-- Ativar primeira aba
+tabButtons[1].BackgroundColor3 = Color3.fromRGB(0, 200, 100)
+tabButtons[1].TextColor3 = Color3.new(1, 1, 1)
+
+-- CONTAINER DE CONTEÚDO
+local content = Instance.new("ScrollingFrame", frame)
+content.Size = UDim2.new(1, 0, 1, -95)
+content.Position = UDim2.new(0, 0, 0, 95)
+content.BackgroundTransparency = 1
+content.BorderSizePixel = 0
+content.ScrollBarThickness = 4
+content.ScrollBarImageColor3 = Color3.fromRGB(100, 100, 100)
+content.CanvasSize = UDim2.new(0, 0, 0, 400)
+content.ZIndex = 100
+
+-- ====================================
+-- ABA 1: MAIN
+-- ====================================
+
+local mainTab = Instance.new("Frame", content)
+mainTab.Size = UDim2.new(1, 0, 1, 0)
+mainTab.BackgroundTransparency = 1
+mainTab.BorderSizePixel = 0
+mainTab.Visible = true
+mainTab.ZIndex = 100
+
+local function MakeMainBtn(txt, y)
+	local b = Instance.new("TextButton", mainTab)
+	b.Size = UDim2.new(0.9, 0, 0, 45)
+	b.Position = UDim2.new(0.05, 0, 0, y)
+	b.Text = txt
+	b.TextScaled = true
+	b.Font = Enum.Font.GothamBold
+	b.TextColor3 = Color3.new(1, 1, 1)
+	b.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+	b.BorderSizePixel = 0
+	b.ZIndex = 100
+	Instance.new("UICorner", b).CornerRadius = UDim.new(0, 12)
+	return b
+end
+
+local noclipBtn = MakeMainBtn("Noclip: OFF", 10)
+local flyBtn = MakeMainBtn("Fly: OFF", 65)
+local aimBtn = MakeMainBtn("Aimbot: OFF", 120)
+local espBtn = MakeMainBtn("ESP: ON", 175)
+
+-- ====================================
+-- ABA 2: FLY SPEED
+-- ====================================
+
+local flySpeedTab = Instance.new("Frame", content)
+flySpeedTab.Size = UDim2.new(1, 0, 1, 0)
+flySpeedTab.BackgroundTransparency = 1
+flySpeedTab.BorderSizePixel = 0
+flySpeedTab.Visible = false
+flySpeedTab.ZIndex = 100
+
+-- Display da velocidade
+local flySpeedDisplay = Instance.new("TextLabel", flySpeedTab)
+flySpeedDisplay.Size = UDim2.new(0.9, 0, 0, 50)
+flySpeedDisplay.Position = UDim2.new(0.05, 0, 0, 10)
+flySpeedDisplay.Text = "VELOCIDADE\n" .. CFG.FlySpeed
+flySpeedDisplay.Font = Enum.Font.GothamBold
+flySpeedDisplay.TextSize = 18
+flySpeedDisplay.TextColor3 = Color3.fromRGB(255, 150, 0)
+flySpeedDisplay.BackgroundColor3 = Color3.fromRGB(30, 30, 35)
+flySpeedDisplay.BorderSizePixel = 0
+flySpeedDisplay.ZIndex = 100
+Instance.new("UICorner", flySpeedDisplay).CornerRadius = UDim.new(0, 12)
+
+-- Botões presets
+local function MakeFlySpeedBtn(speed, label, yPos)
+	local btn = Instance.new("TextButton", flySpeedTab)
+	btn.Size = UDim2.new(0.42, 0, 0, 45)
+	btn.Position = UDim2.new(0.05, 0, 0, yPos)
+	btn.Text = label .. "\n" .. speed
+	btn.TextScaled = true
+	btn.Font = Enum.Font.GothamBold
+	btn.TextColor3 = Color3.new(1, 1, 1)
+	btn.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+	btn.BorderSizePixel = 0
+	btn.ZIndex = 100
+	Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 10)
+	
+	btn.MouseButton1Click:Connect(function()
+		CFG.FlySpeed = speed
+		flySpeedDisplay.Text = "VELOCIDADE\n" .. CFG.FlySpeed
+		UpdateFlySpeedSlider()
+	end)
+	
+	return btn
+end
+
+MakeFlySpeedBtn(30, "LENTO", 70)
+local btn2 = MakeFlySpeedBtn(50, "NORMAL", 70)
+btn2.Position = UDim2.new(0.53, 0, 0, 70)
+
+MakeFlySpeedBtn(80, "RÁPIDO", 125)
+local btn3 = MakeFlySpeedBtn(80, "RÁPIDO", 125)
+btn3.Position = UDim2.new(0.53, 0, 0, 125)
+
+MakeFlySpeedBtn(120, "M. RÁPIDO", 180)
+local btn4 = MakeFlySpeedBtn(120, "M. RÁPIDO", 180)
+btn4.Position = UDim2.new(0.53, 0, 0, 180)
+
+-- Slider
+local sliderLabel = Instance.new("TextLabel", flySpeedTab)
+sliderLabel.Size = UDim2.new(0.9, 0, 0, 20)
+sliderLabel.Position = UDim2.new(0.05, 0, 0, 235)
+sliderLabel.Text = "AJUSTE FINO:"
+sliderLabel.Font = Enum.Font.GothamBold
+sliderLabel.TextSize = 12
+sliderLabel.TextColor3 = Color3.new(1, 1, 1)
+sliderLabel.BackgroundTransparency = 1
+sliderLabel.TextXAlignment = Enum.TextXAlignment.Left
+sliderLabel.ZIndex = 100
+
+local sliderBG = Instance.new("Frame", flySpeedTab)
+sliderBG.Size = UDim2.new(0.8, 0, 0, 10)
+sliderBG.Position = UDim2.new(0.1, 0, 0, 260)
+sliderBG.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+sliderBG.BorderSizePixel = 0
+sliderBG.ZIndex = 100
+Instance.new("UICorner", sliderBG).CornerRadius = UDim.new(1, 0)
+
+local sliderFill = Instance.new("Frame", sliderBG)
+sliderFill.Size = UDim2.new((CFG.FlySpeed - CFG.FlySpeedMin) / (CFG.FlySpeedMax - CFG.FlySpeedMin), 0, 1, 0)
+sliderFill.BackgroundColor3 = Color3.fromRGB(255, 150, 0)
+sliderFill.BorderSizePixel = 0
+sliderFill.ZIndex = 101
+Instance.new("UICorner", sliderFill).CornerRadius = UDim.new(1, 0)
+
+local sliderThumb = Instance.new("TextButton", sliderBG)
+sliderThumb.Size = UDim2.new(0, 18, 0, 18)
+sliderThumb.Position = UDim2.new((CFG.FlySpeed - CFG.FlySpeedMin) / (CFG.FlySpeedMax - CFG.FlySpeedMin), -9, 0.5, -9)
+sliderThumb.BackgroundColor3 = Color3.fromRGB(255, 150, 0)
+sliderThumb.BorderSizePixel = 0
+sliderThumb.ZIndex = 102
+sliderThumb.Text = ""
+Instance.new("UICorner", sliderThumb).CornerRadius = UDim.new(1, 0)
+
+local draggingSlider = false
+
+sliderThumb.MouseButton1Down:Connect(function()
+	draggingSlider = true
+end)
+
+UIS.InputEnded:Connect(function(input, gameProcessed)
+	if input.UserInputType == Enum.UserInputType.MouseButton1 then
+		draggingSlider = false
+	end
+end)
+
+RunService.RenderStepped:Connect(function()
+	if draggingSlider then
+		local mouse = LP:GetMouse()
+		local sliderPos = sliderBG.AbsolutePosition.X
+		local sliderSize = sliderBG.AbsoluteSize.X
+		local mouseX = mouse.X
+		
+		local percent = math.clamp((mouseX - sliderPos) / sliderSize, 0, 1)
+		local newSpeed = math.floor(CFG.FlySpeedMin + (CFG.FlySpeedMax - CFG.FlySpeedMin) * percent)
+		
+		CFG.FlySpeed = newSpeed
+		UpdateFlySpeedSlider()
+	end
+end)
+
+function UpdateFlySpeedSlider()
+	local percent = (CFG.FlySpeed - CFG.FlySpeedMin) / (CFG.FlySpeedMax - CFG.FlySpeedMin)
+	sliderFill.Size = UDim2.new(percent, 0, 1, 0)
+	sliderThumb.Position = UDim2.new(percent, -9, 0.5, -9)
+	flySpeedDisplay.Text = "VELOCIDADE\n" .. CFG.FlySpeed
+end
+
+-- Botões +/-
+local minusBtn = Instance.new("TextButton", flySpeedTab)
+minusBtn.Size = UDim2.new(0.35, 0, 0, 40)
+minusBtn.Position = UDim2.new(0.05, 0, 0, 290)
+minusBtn.Text = "−  (−5)"
+minusBtn.Font = Enum.Font.GothamBold
+minusBtn.TextSize = 16
+minusBtn.TextColor3 = Color3.new(1, 1, 1)
+minusBtn.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
+minusBtn.BorderSizePixel = 0
+minusBtn.ZIndex = 100
+Instance.new("UICorner", minusBtn).CornerRadius = UDim.new(0, 10)
+
+minusBtn.MouseButton1Click:Connect(function()
+	CFG.FlySpeed = math.max(CFG.FlySpeed - 5, CFG.FlySpeedMin)
+	UpdateFlySpeedSlider()
+end)
+
+local plusBtn = Instance.new("TextButton", flySpeedTab)
+plusBtn.Size = UDim2.new(0.35, 0, 0, 40)
+plusBtn.Position = UDim2.new(0.6, 0, 0, 290)
+plusBtn.Text = "+  (+5)"
+plusBtn.Font = Enum.Font.GothamBold
+plusBtn.TextSize = 16
+plusBtn.TextColor3 = Color3.new(1, 1, 1)
+plusBtn.BackgroundColor3 = Color3.fromRGB(0, 200, 100)
+plusBtn.BorderSizePixel = 0
+plusBtn.ZIndex = 100
+Instance.new("UICorner", plusBtn).CornerRadius = UDim.new(0, 10)
+
+plusBtn.MouseButton1Click:Connect(function()
+	CFG.FlySpeed = math.min(CFG.FlySpeed + 5, CFG.FlySpeedMax)
+	UpdateFlySpeedSlider()
+end)
+
+-- ====================================
+-- ABA 3: AIM TARGET
+-- ====================================
+
+local aimTargetTab = Instance.new("Frame", content)
+aimTargetTab.Size = UDim2.new(1, 0, 1, 0)
+aimTargetTab.BackgroundTransparency = 1
+aimTargetTab.BorderSizePixel = 0
+aimTargetTab.Visible = false
+aimTargetTab.ZIndex = 100
+
+local aimLabel = Instance.new("TextLabel", aimTargetTab)
+aimLabel.Size = UDim2.new(0.9, 0, 0, 30)
+aimLabel.Position = UDim2.new(0.05, 0, 0, 10)
+aimLabel.Text = "SELECIONE TIMES"
+aimLabel.Font = Enum.Font.GothamBold
+aimLabel.TextSize = 16
+aimLabel.TextColor3 = Color3.fromRGB(0, 255, 200)
+aimLabel.BackgroundTransparency = 1
+aimLabel.ZIndex = 100
+
+local teamColors = {
+	Guards = Color3.fromRGB(0, 120, 255),
+	Police = Color3.fromRGB(0, 120, 255),
+	Criminals = Color3.fromRGB(255, 0, 0),
+	Inmates = Color3.fromRGB(255, 150, 0)
+}
+
+local function MakeTeamToggle(teamName, yPos, color)
+	local btn = Instance.new("TextButton", aimTargetTab)
+	btn.Size = UDim2.new(0.9, 0, 0, 45)
+	btn.Position = UDim2.new(0.05, 0, 0, yPos)
+	btn.Text = teamName .. ": ✓"
+	btn.TextScaled = true
+	btn.Font = Enum.Font.GothamBold
+	btn.TextColor3 = Color3.new(1, 1, 1)
+	btn.BackgroundColor3 = color
+	btn.BorderSizePixel = 0
+	btn.ZIndex = 100
+	Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 12)
+	
+	btn.MouseButton1Click:Connect(function()
+		CFG.AimbotTargetTeams[teamName] = not CFG.AimbotTargetTeams[teamName]
+		if CFG.AimbotTargetTeams[teamName] then
+			btn.Text = teamName .. ": ✓"
+			btn.BackgroundColor3 = color
+		else
+			btn.Text = teamName .. ": ✗"
+			btn.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+		end
+	end)
+	
+	return btn
+end
+
+MakeTeamToggle("Guards", 50, teamColors.Guards)
+MakeTeamToggle("Police", 105, teamColors.Police)
+MakeTeamToggle("Criminals", 160, teamColors.Criminals)
+MakeTeamToggle("Inmates", 215, teamColors.Inmates)
+
+-- ====================================
+-- ABA 4: QUICK ACCESS
+-- ====================================
+
+local quickTab = Instance.new("Frame", content)
+quickTab.Size = UDim2.new(1, 0, 1, 0)
+quickTab.BackgroundTransparency = 1
+quickTab.BorderSizePixel = 0
+quickTab.Visible = false
+quickTab.ZIndex = 100
+
+local quickLabel = Instance.new("TextLabel", quickTab)
+quickLabel.Size = UDim2.new(0.9, 0, 0, 30)
+quickLabel.Position = UDim2.new(0.05, 0, 0, 10)
+quickLabel.Text = "SELECIONE FEATURE"
+quickLabel.Font = Enum.Font.GothamBold
+quickLabel.TextSize = 16
+quickLabel.TextColor3 = Color3.fromRGB(0, 255, 200)
+quickLabel.BackgroundTransparency = 1
+quickLabel.ZIndex = 100
+
+local function MakeQuickAccessBtn(feature, yPos)
+	local btn = Instance.new("TextButton", quickTab)
+	btn.Size = UDim2.new(0.9, 0, 0, 45)
+	btn.Position = UDim2.new(0.05, 0, 0, yPos)
+	btn.Text = feature
+	btn.TextScaled = true
+	btn.Font = Enum.Font.GothamBold
+	btn.TextColor3 = Color3.new(1, 1, 1)
+	btn.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+	btn.BorderSizePixel = 0
+	btn.ZIndex = 100
+	Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 12)
+	
+	if CFG.QuickAccessFeature == feature then
+		btn.BackgroundColor3 = Color3.fromRGB(0, 255, 200)
+		btn.TextColor3 = Color3.fromRGB(0, 0, 0)
+	end
+	
+	btn.MouseButton1Click:Connect(function()
+		for _, child in pairs(quickTab:GetChildren()) do
+			if child:IsA("TextButton") and (child.Text == "Noclip" or child.Text == "Fly" or child.Text == "Aimbot" or child.Text == "ESP") then
+				child.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+				child.TextColor3 = Color3.new(1, 1, 1)
+			end
+		end
+		
+		CFG.QuickAccessFeature = feature
+		btn.BackgroundColor3 = Color3.fromRGB(0, 255, 200)
+		btn.TextColor3 = Color3.fromRGB(0, 0, 0)
+		quickAccessLabel.Text = feature
+	end)
+	
+	return btn
+end
+
+MakeQuickAccessBtn("Noclip", 50)
+MakeQuickAccessBtn("Fly", 105)
+MakeQuickAccessBtn("Aimbot", 160)
+MakeQuickAccessBtn("ESP", 215)
+
+-- ====================================
+-- CONTROLAR VISIBILIDADE DAS ABAS
+-- ====================================
+
+local function ShowTab(tabName)
+	mainTab.Visible = tabName == "Main"
+	flySpeedTab.Visible = tabName == "Fly Speed"
+	aimTargetTab.Visible = tabName == "Aim Target"
+	quickTab.Visible = tabName == "Quick"
+end
+
+-- Conectar cliques das abas
+for i, btn in pairs(tabButtons) do
+	btn.MouseButton1Click:Connect(function()
+		CurrentTab = tabNames[i]
+		for _, tabBtn in pairs(tabButtons) do
+			tabBtn.BackgroundColor3 = Color3.fromRGB(30, 30, 35)
+			tabBtn.TextColor3 = Color3.new(0.7, 0.7, 0.7)
+		end
+		btn.BackgroundColor3 = Color3.fromRGB(0, 200, 100)
+		btn.TextColor3 = Color3.new(1, 1, 1)
+		ShowTab(CurrentTab)
+	end)
+end
+
+openBtn.MouseButton1Click:Connect(function()
+	frame.Visible = not frame.Visible
+	if frame.Visible then
+		ShowTab("Main")
+	end
+end)
+
+-- QUICK ACCESS BUTTON ACTION
+quickAccessBtn.MouseButton1Click:Connect(function()
+	local feature = CFG.QuickAccessFeature
+	
+	if feature == "Noclip" then
+		CFG.Noclip = not CFG.Noclip
+		noclipBtn.Text = CFG.Noclip and "Noclip: ON" or "Noclip: OFF"
+		noclipBtn.BackgroundColor3 = CFG.Noclip and Color3.fromRGB(0, 200, 100) or Color3.fromRGB(60, 60, 60)
+		quickAccessBtn.BackgroundColor3 = CFG.Noclip and Color3.fromRGB(0, 200, 100) or Color3.fromRGB(255, 0, 0)
+		
+	elseif feature == "Fly" then
+		CFG.Fly = not CFG.Fly
+		flyBtn.Text = CFG.Fly and "Fly: ON" or "Fly: OFF"
+		flyBtn.BackgroundColor3 = CFG.Fly and Color3.fromRGB(0, 200, 100) or Color3.fromRGB(60, 60, 60)
+		quickAccessBtn.BackgroundColor3 = CFG.Fly and Color3.fromRGB(0, 200, 100) or Color3.fromRGB(255, 0, 0)
+		if not CFG.Fly and LP.Character and LP.Character:FindFirstChild("HumanoidRootPart") then
+			LP.Character.HumanoidRootPart.Anchored = false
+		end
+		
+	elseif feature == "Aimbot" then
+		CFG.Aimbot = not CFG.Aimbot
+		aimBtn.Text = CFG.Aimbot and "Aimbot: ON" or "Aimbot: OFF"
+		aimBtn.BackgroundColor3 = CFG.Aimbot and Color3.fromRGB(0, 200, 100) or Color3.fromRGB(60, 60, 60)
+		quickAccessBtn.BackgroundColor3 = CFG.Aimbot and Color3.fromRGB(0, 200, 100) or Color3.fromRGB(255, 0, 0)
+		
+	elseif feature == "ESP" then
+		CFG.ESP = not CFG.ESP
+		espBtn.Text = CFG.ESP and "ESP: ON" or "ESP: OFF"
+		espBtn.BackgroundColor3 = CFG.ESP and Color3.fromRGB(0, 200, 100) or Color3.fromRGB(60, 60, 60)
+		quickAccessBtn.BackgroundColor3 = CFG.ESP and Color3.fromRGB(0, 200, 100) or Color3.fromRGB(255, 0, 0)
+	end
+end)
+
+---
+
+-- NOCLIP
+
+RunService.Stepped:Connect(function()
+	if CFG.Noclip and LP.Character then
+		for _, v in pairs(LP.Character:GetDescendants()) do
+			if v:IsA("BasePart") then
+				v.CanCollide = false
+			end
+		end
+	end
+end)
+
+noclipBtn.MouseButton1Click:Connect(function()
+	CFG.Noclip = not CFG.Noclip
+	noclipBtn.Text = CFG.Noclip and "Noclip: ON" or "Noclip: OFF"
+	noclipBtn.BackgroundColor3 = CFG.Noclip and Color3.fromRGB(0, 200, 100) or Color3.fromRGB(60, 60, 60)
+end)
+
+---
+
+-- FLY MOBILE COM CONTROLE DE VELOCIDADE
+
+RunService.RenderStepped:Connect(function(dt)
+	if CFG.Fly and LP.Character and LP.Character:FindFirstChild("HumanoidRootPart") then
+		local hrp = LP.Character.HumanoidRootPart
+		hrp.Anchored = true
+		hrp.CFrame = hrp.CFrame + Camera.CFrame.LookVector * CFG.FlySpeed * dt
+	end
+end)
+
+flyBtn.MouseButton1Click:Connect(function()
+	CFG.Fly = not CFG.Fly
+	flyBtn.Text = CFG.Fly and "Fly: ON" or "Fly: OFF"
+	flyBtn.BackgroundColor3 = CFG.Fly and Color3.fromRGB(0, 200, 100) or Color3.fromRGB(60, 60, 60)
+	if not CFG.Fly and LP.Character and LP.Character:FindFirstChild("HumanoidRootPart") then
+		LP.Character.HumanoidRootPart.Anchored = false
+	end
+end)
+
+---
+
+-- AIMBOT + FOV COM SELEÇÃO DE TIME
+
+local circle = Drawing.new("Circle")
+circle.Thickness = 2
+circle.Filled = false
+circle.Color = Color3.fromRGB(255, 0, 0)
+circle.Visible = false
+circle.Radius = CFG.FOV
+
+local function GetClosestEnemyWithTeamFilter()
+	local closest, dist = nil, math.huge
+	for _, plr in pairs(Players:GetPlayers()) do
+		if plr ~= LP and plr.Character and plr.Character:FindFirstChild("Head") then
+			if IsEnemy(plr) then
+				if plr.Team and CFG.AimbotTargetTeams[plr.Team.Name] then
+					local pos, vis = Camera:WorldToViewportPoint(plr.Character.Head.Position)
+					if vis then
+						local mag = (Vector2.new(pos.X, pos.Y) - Camera.ViewportSize / 2).Magnitude
+						if mag < dist and mag < CFG.FOV then
+							dist = mag
+							closest = plr
+						end
+					end
+				end
+			end
+		end
+	end
+	return closest
+end
+
+RunService.RenderStepped:Connect(function()
+	circle.Position = Camera.ViewportSize / 2
+	circle.Visible = CFG.Aimbot
+
+	if CFG.Aimbot then  
+		local target = GetClosestEnemyWithTeamFilter()  
+		if target and target.Character then  
+			local cf = CFrame.new(Camera.CFrame.Position, target.Character.Head.Position)  
+			Camera.CFrame = Camera.CFrame:Lerp(cf, 1 / CFG.AimSmooth)  
+		end  
+	end
+
+end)
+
+aimBtn.MouseButton1Click:Connect(function()
+	CFG.Aimbot = not CFG.Aimbot
+	aimBtn.Text = CFG.Aimbot and "Aimbot: ON" or "Aimbot: OFF"
+	aimBtn.BackgroundColor3 = CFG.Aimbot and Color3.fromRGB(0, 200, 100) or Color3.fromRGB(60, 60, 60)
+end)
+
+---
+
+-- ESP CORRIGIDO POR TIME
+
+local function CreateESPForPlayer(targetPlayer)
+	if targetPlayer == LP then return end
+	if ESPCache[targetPlayer] then return end
+
+	local box = Drawing.new("Square")  
+	box.Color = GetESPColor(targetPlayer)
+	box.Thickness = 2  
+	box.Filled = false  
+	box.Visible = false  
+
+	local nametag = Drawing.new("Text")  
+	nametag.Color = GetESPColor(targetPlayer)
+	nametag.Size = 16  
+	nametag.Center = true  
+	nametag.Outline = true  
+	nametag.Font = 2  
+	nametag.Visible = false  
+
+	local distText = Drawing.new("Text")  
+	distText.Color = GetESPColor(targetPlayer)
+	distText.Size = 14  
+	distText.Center = true  
+	distText.Outline = true  
+	distText.Font = 2  
+	distText.Visible = false  
+
+	local healthBar = Drawing.new("Square")  
+	healthBar.Color = Color3.fromRGB(255, 0, 0)  
+	healthBar.Thickness = 1  
+	healthBar.Filled = true  
+	healthBar.Visible = false  
+
+	local healthBarBG = Drawing.new("Square")  
+	healthBarBG.Color = Color3.fromRGB(50, 50, 50)  
+	healthBarBG.Thickness = 1  
+	healthBarBG.Filled = true  
+	healthBarBG.Visible = false  
+
+	local healthText = Drawing.new("Text")
+	healthText.Color = Color3.fromRGB(255, 255, 255)
+	healthText.Size = 12
+	healthText.Outline = true
+	healthText.Font = 2
+	healthText.Visible = false
+
+	ESPCache[targetPlayer] = {
+		box = box,
+		nametag = nametag,
+		distText = distText,
+		healthBar = healthBar,
+		healthBarBG = healthBarBG,
+		healthText = healthText,
+		stepped = nil
+	}
+
+	local function UpdateESP()
+		if not CFG.ESP then
+			box.Visible = false
+			nametag.Visible = false
+			distText.Visible = false
+			healthBar.Visible = false
+			healthBarBG.Visible = false
+			healthText.Visible = false
+			return
+		end
+
+		if not targetPlayer or not targetPlayer.Character then return end
+
+		local root = targetPlayer.Character:FindFirstChild("HumanoidRootPart")
+		local head = targetPlayer.Character:FindFirstChild("Head")
+		local humanoid = targetPlayer.Character:FindFirstChild("Humanoid")
+
+		if not root or not head or not humanoid or humanoid.Health <= 0 then
+			box.Visible = false
+			nametag.Visible = false
+			distText.Visible = false
+			healthBar.Visible = false
+			healthBarBG.Visible = false
+			healthText.Visible = false
+			return
+		end
+
+		if not IsEnemy(targetPlayer) then
+			box.Visible = false
+			nametag.Visible = false
+			distText.Visible = false
+			healthBar.Visible = false
+			healthBarBG.Visible = false
+			healthText.Visible = false
+			return
+		end
+
+		local rootPos, rootOnScreen = Camera:WorldToViewportPoint(root.Position)
+		local headPos, headOnScreen = Camera:WorldToViewportPoint(head.Position + Vector3.new(0, 0.5, 0))
+
+		if rootOnScreen and headOnScreen then
+			local height = math.abs(headPos.Y - rootPos.Y) * 2  
+			local width = height / 1.6  
+
+			local espColor = GetESPColor(targetPlayer)
+			box.Color = espColor
+			nametag.Color = espColor
+			distText.Color = espColor
+
+			box.Size = Vector2.new(width, height)  
+			box.Position = Vector2.new(rootPos.X - width / 2, rootPos.Y - height / 2)  
+			box.Visible = true  
+
+			local teamTag = targetPlayer.Team and targetPlayer.Team.Name or "Unknown"
+			nametag.Position = Vector2.new(rootPos.X, rootPos.Y - height / 2 - 20)  
+			nametag.Text = targetPlayer.Name .. " [" .. teamTag .. "]"
+			nametag.Visible = true  
+
+			local dist = (LP.Character and LP.Character:FindFirstChild("HumanoidRootPart") and (LP.Character.HumanoidRootPart.Position - root.Position).Magnitude) or 0
+			distText.Position = Vector2.new(rootPos.X, rootPos.Y + height / 2 + 8)
+			distText.Text = string.format("%.1f m", dist / 3)
+			distText.Visible = true
+
+			local healthPercent = math.clamp(humanoid.Health / humanoid.MaxHealth, 0, 1)
+			local barWidth = 5  
+			local barHeight = height  
+			local barX = rootPos.X - width / 2 - barWidth - 5  
+			local barY = rootPos.Y - height / 2  
+
+			healthBarBG.Size = Vector2.new(barWidth, barHeight)  
+			healthBarBG.Position = Vector2.new(barX, barY)  
+			healthBarBG.Visible = true  
+
+			healthBar.Size = Vector2.new(barWidth, barHeight * healthPercent)  
+			healthBar.Position = Vector2.new(barX, barY + (barHeight * (1 - healthPercent)))  
+			healthBar.Color = healthPercent > 0.5 and Color3.fromRGB(0, 255, 0) or healthPercent > 0.25 and Color3.fromRGB(255, 255, 0) or Color3.fromRGB(255, 0, 0)  
+			healthBar.Visible = true  
+
+			healthText.Position = Vector2.new(barX - 15, barY + barHeight / 2)
+			healthText.Text = string.format("%.0f/%.0f", humanoid.Health, humanoid.MaxHealth)
+			healthText.Visible = true
+		else  
+			box.Visible = false  
+			nametag.Visible = false  
+			distText.Visible = false
+			healthBar.Visible = false  
+			healthBarBG.Visible = false  
+			healthText.Visible = false
+		end  
+	end
+
+	ESPCache[targetPlayer].stepped = RunService.RenderStepped:Connect(UpdateESP)
+
+	targetPlayer.AncestryChanged:Connect(function(_, parent)
+		if parent == nil then
+			if ESPCache[targetPlayer] then
+				box:Remove()
+				nametag:Remove()
+				distText:Remove()
+				healthBar:Remove()
+				healthBarBG:Remove()
+				healthText:Remove()
+				if ESPCache[targetPlayer].stepped then
+					ESPCache[targetPlayer].stepped:Disconnect()
+				end
+				ESPCache[targetPlayer] = nil
+			end
+		end
+	end)
+
+	targetPlayer.Changed:Connect(function(prop)
+		if prop == "Team" then
+			local newColor = GetESPColor(targetPlayer)
+			box.Color = newColor
+			nametag.Color = newColor
+			distText.Color = newColor
+		end
+	end)
+
+end
+
+for _, plr in pairs(Players:GetPlayers()) do
+	if plr ~= LP then
+		CreateESPForPlayer(plr)
+	end
+end
+
+Players.PlayerAdded:Connect(function(plr)
+	if plr ~= LP then
+		task.wait(0.5)
+		CreateESPForPlayer(plr)
+	end
+end)
+
+espBtn.MouseButton1Click:Connect(function()
+	CFG.ESP = not CFG.ESP
+	espBtn.Text = CFG.ESP and "ESP: ON" or "ESP: OFF"
+	espBtn.BackgroundColor3 = CFG.ESP and Color3.fromRGB(0, 200, 100) or Color3.fromRGB(60, 60, 60)
+end)
